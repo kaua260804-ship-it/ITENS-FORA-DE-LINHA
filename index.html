@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Análise de Vendas e Avarias</title>
+
+  <!-- Favicon inline -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/style.css" />
+
+  <!-- SheetJS -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+  <!-- ============ HEADER ============ -->
+  <header class="app-header">
+    <div class="brand">
+      <div class="logo">📊</div>
+      <div class="brand-text">
+        <h1>Vendas &amp; Avarias</h1>
+        <p class="subtitle">Dashboard de análise operacional</p>
+      </div>
+      <div class="header-stats">
+        <div class="stat-pill stat-total">
+          <span class="stat-label">Total</span>
+          <span class="stat-value" id="statTotal">—</span>
+        </div>
+        <div class="stat-pill stat-feitos">
+          <span class="stat-label">Feitos</span>
+          <span class="stat-value" id="statFeitos">—</span>
+        </div>
+        <div class="stat-pill stat-pendentes">
+          <span class="stat-label">Pendentes</span>
+          <span class="stat-value" id="statPendentes">—</span>
+        </div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <span id="sheetsBadge" class="badge badge-gray" title="Status da conexão com Google Sheets">Sheets: —</span>
+      <button id="btnDarkMode" class="btn btn-ghost" title="Alternar tema">🌙</button>
+    </div>
+  </header>
+
+  <!-- ============ ALERTA DE FALLBACK ============ -->
+  <div id="fallbackAlert" class="alert hidden">
+    ⚠️ Não foi possível carregar o arquivo <code>/dados/BASE VENDA E AVAR (1).xlsx</code>.
+    Usando <strong>dados de exemplo</strong>. Coloque o arquivo na pasta <code>/dados/</code> para usar os dados reais.
+  </div>
+
+  <!-- ============ KPI CARDS ============ -->
+  <section class="kpi-grid" id="kpiGrid">
+    <div class="kpi-card">
+      <div class="kpi-label">Total Vendas</div>
+      <div class="kpi-value" id="kpiVendas">—</div>
+    </div>
+    <div class="kpi-card kpi-alert">
+      <div class="kpi-label">Total Perdas</div>
+      <div class="kpi-value" id="kpiPerdas">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">% Perda sobre Venda</div>
+      <div class="kpi-value" id="kpiPercPerda">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">QTD Total</div>
+      <div class="kpi-value" id="kpiQtd">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Ticket Médio</div>
+      <div class="kpi-value" id="kpiTicket">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Lucro Total / %Margem</div>
+      <div class="kpi-value" id="kpiLucro">—</div>
+    </div>
+  </section>
+
+  <!-- ============ FILTROS ============ -->
+  <section class="filters-panel">
+    <div class="filters-header">
+      <h2>Filtros</h2>
+      <div class="filters-actions">
+        <span id="resultCount" class="result-count">0 registros encontrados</span>
+        <button id="btnClearFilters" class="btn btn-ghost">Limpar Filtros</button>
+      </div>
+    </div>
+    <div class="filters-grid">
+      <div class="filter-item">
+        <label for="fMes">Mês</label>
+        <select id="fMes" multiple size="4"></select>
+      </div>
+      <div class="filter-item">
+        <label for="fCodigo">Código</label>
+        <input type="text" id="fCodigo" placeholder="Ex: 1234" />
+      </div>
+      <div class="filter-item autocomplete-wrap">
+        <label for="fProduto">Produto</label>
+        <input type="text" id="fProduto" placeholder="Digite para buscar..." autocomplete="off" />
+        <div id="produtoSuggestions" class="suggestions hidden"></div>
+      </div>
+      <div class="filter-item">
+        <label for="fCat2">Categoria N2</label>
+        <select id="fCat2"></select>
+      </div>
+      <div class="filter-item">
+        <label for="fCat3">Categoria N3</label>
+        <select id="fCat3"></select>
+      </div>
+      <div class="filter-item">
+        <label for="fCat4">Categoria N4</label>
+        <select id="fCat4"></select>
+      </div>
+      <div class="filter-item">
+        <label for="fForn">Fornecedor</label>
+        <select id="fForn"></select>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ AÇÕES ============ -->
+  <section class="actions-bar">
+    <button id="btnExportCSV" class="btn btn-primary">⬇️ Exportar CSV</button>
+    <button id="btnExportXLSX" class="btn btn-primary">📊 Exportar Excel</button>
+    <button id="btnPrint" class="btn btn-ghost">🖨️ Imprimir / PDF</button>
+    <button id="btnRefreshSheets" class="btn btn-ghost">🔄 Atualizar Sheets</button>
+    <button id="btnSaveLocal" class="btn btn-ghost">💾 Salvar Localmente</button>
+    <button id="btnSendSheets" class="btn btn-success" title="Envia apenas os produtos marcados como FORA DE LINHA">
+      ☁️ Enviar FORA DE LINHA p/ Sheets
+    </button>
+    <button id="btnSendLog" class="btn btn-ghost" title="Envia o log completo (KPIs + registros) para LOG_CONSULTAS">
+      📝 Enviar Log Completo
+    </button>
+  </section>
+
+  <!-- ============ TABELA PIVOT ============ -->
+  <section class="table-section">
+    <div class="table-wrapper">
+      <table id="pivotTable" class="pivot-table">
+        <thead id="pivotThead"></thead>
+        <tbody id="pivotTbody"></tbody>
+        <tfoot id="pivotTfoot"></tfoot>
+      </table>
+    </div>
+    <div id="loadingSkeleton" class="skeleton hidden">
+      <div class="skeleton-row"></div>
+      <div class="skeleton-row"></div>
+      <div class="skeleton-row"></div>
+      <div class="skeleton-row"></div>
+      <div class="skeleton-row"></div>
+    </div>
+  </section>
+
+  <!-- ============ FOOTER ============ -->
+  <footer class="app-footer">
+    <span>© <span id="year"></span> — Análise de Vendas e Avarias</span>
+  </footer>
+
+  <!-- ============ SCRIPTS (ordem importa) ============ -->
+  <script src="./js/storage.js"></script>
+  <script src="./js/appsscript.js"></script>
+  <script src="./js/filters.js"></script>
+  <script src="./js/pivot-core.js"></script>
+  <script src="./js/pivot-render.js"></script>
+  <script src="./js/app.js"></script>
+</body>
+</html>
